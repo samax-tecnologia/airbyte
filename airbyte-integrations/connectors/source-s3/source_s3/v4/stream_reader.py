@@ -97,10 +97,23 @@ class SourceS3StreamReader(AbstractFileBasedStreamReader):
 
         The method assumes a role specified in the `self.config.role_arn` and creates a session with the S3 service.
         If `AWS_ASSUME_ROLE_EXTERNAL_ID` environment variable is set, it will be used during the role assumption for additional security.
+
+        If `aws_access_key_id` and `aws_secret_access_key` are provided in the config, they will be used to authenticate
+        the STS client for the AssumeRole call. This enables cross-account access where the provided credentials belong
+        to an account that has permission to assume a role in another account that has S3 access.
         """
 
         def refresh():
-            client = boto3.client("sts")
+            # Use provided credentials if available, otherwise fall back to default credential chain
+            if self.config.role_arn and self.config.aws_access_key_id and self.config.aws_secret_access_key:
+                client = boto3.client(
+                    "sts",
+                    aws_access_key_id=self.config.aws_access_key_id,
+                    aws_secret_access_key=self.config.aws_secret_access_key,
+                )
+            else:
+                client = boto3.client("sts")
+
             if AWS_EXTERNAL_ID:
                 role = client.assume_role(
                     RoleArn=self.config.role_arn,

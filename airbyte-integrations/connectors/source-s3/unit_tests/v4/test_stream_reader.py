@@ -331,6 +331,51 @@ def test_get_iam_s3_client(boto3_client_mock):
     assert s3_client is not None
 
 
+@mock_sts
+@patch("source_s3.v4.stream_reader.boto3.client")
+def test_get_iam_s3_client_with_credentials_for_assume_role(boto3_client_mock):
+    """
+    Test that when aws_access_key_id and aws_secret_access_key are provided along with role_arn,
+    those credentials are used to create the STS client for the AssumeRole call.
+    This enables cross-account access where the provided credentials belong to an account
+    that has permission to assume a role in another account that has S3 access.
+    """
+    # Mock the STS client assume_role method
+    boto3_client_mock.return_value.assume_role.return_value = {
+        "Credentials": {
+            "AccessKeyId": "assumed_access_key_id",
+            "SecretAccessKey": "assumed_secret_access_key",
+            "SessionToken": "assumed_session_token",
+            "Expiration": datetime.now(),
+        }
+    }
+
+    # Instantiate your stream reader and set the config with credentials for assume role
+    reader = SourceS3StreamReader()
+    reader.config = Config(
+        bucket="test",
+        aws_access_key_id="source_account_access_key",
+        aws_secret_access_key="source_account_secret_key",
+        role_arn="arn:aws:iam::123456789012:role/my-role",
+        streams=[],
+        endpoint=None,
+    )
+
+    # Call _get_iam_s3_client
+    with Stubber(reader.s3_client):
+        s3_client = reader._get_iam_s3_client({})
+
+    # Verify that boto3.client was called with the provided credentials for STS
+    boto3_client_mock.assert_any_call(
+        "sts",
+        aws_access_key_id="source_account_access_key",
+        aws_secret_access_key="source_account_secret_key",
+    )
+
+    # Assertions to validate the s3 client
+    assert s3_client is not None
+
+
 @pytest.mark.parametrize(
     "start_date, last_modified_date, expected_result",
     (
