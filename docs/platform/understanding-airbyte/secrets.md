@@ -53,6 +53,71 @@ Airbyte saves the following JSON blob:
 
 Upon any operation, Airbyte reads the obfuscated JSON spec, extracts the secret coordinate and hydrates the correct secret value before passing it to consumers.
 
+## Referencing External Secrets
+
+Instead of letting Airbyte create and manage secrets automatically, you can reference pre-existing secrets that you've created directly in your secret manager (AWS Secrets Manager, Google Secret Manager, Azure Key Vault, or HashiCorp Vault).
+
+This is useful when:
+- You want to manage secrets outside of Airbyte (e.g., via Terraform, Pulumi, or another IaC tool)
+- You need to share secrets across multiple applications
+- You have existing secrets created by other systems that you want to reuse
+
+### Syntax
+
+Use the `${SECRET_NAME}` syntax to reference an external secret:
+
+```json
+{
+   "email": "itpartners@noodle.com",
+   "api_token": "${MY_API_TOKEN}"
+}
+```
+
+Or use the explicit prefix syntax:
+
+```json
+{
+   "email": "itpartners@noodle.com",
+   "api_token": "secret_coordinate::MY_API_TOKEN"
+}
+```
+
+Both syntaxes are equivalent. The `${...}` syntax is more familiar to users of environment variables, while `secret_coordinate::` is more explicit.
+
+### How It Works
+
+When Airbyte encounters an external secret reference:
+1. It stores the reference (not the actual value) in the database
+2. During sync execution, Airbyte reads the secret value from your configured secret manager using the exact name you provided
+3. The secret is never copied - Airbyte always reads from the original location
+
+### Example: AWS Secrets Manager
+
+If you have a secret named `production/api-keys/my-service` in AWS Secrets Manager:
+
+```json
+{
+   "api_key": "${production/api-keys/my-service}"
+}
+```
+
+### Example: Google Secret Manager
+
+If you have a secret named `my-database-password` in Google Secret Manager:
+
+```json
+{
+   "password": "${my-database-password}"
+}
+```
+
+### Important Considerations
+
+- **Secret must exist**: The referenced secret must exist in your configured secret manager before you create or update the connector. Airbyte will validate this and return an error if the secret is not found.
+- **No automatic rotation**: Airbyte won't manage or rotate external secrets. You're responsible for rotation.
+- **No automatic cleanup**: When you delete a connector, Airbyte won't delete external secrets (since they may be used elsewhere).
+- **Permissions required**: Airbyte needs read access to the external secrets in your secret manager.
+
 ## Operational Details
 
 1. When configuration is updated, Airbyte increments a secret coordinate's version while preserving the prefix.
