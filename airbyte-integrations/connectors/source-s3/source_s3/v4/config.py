@@ -41,8 +41,17 @@ class Config(AbstractFileBasedSpec):
         "When provided along with AWS Access Key ID and Secret, the connector will use those credentials to call "
         "AWS STS AssumeRole and obtain temporary credentials for the specified role. This enables cross-account access "
         "where the provided credentials belong to an account that has permission to assume a role in another account that has S3 access. "
-        "Set the External ID to the Airbyte workspace ID, which can be found in the URL of this page.",
+        "For cross-account role chaining, also provide the Customer Role ARN field.",
         order=6,
+    )
+
+    customer_role_arn: Optional[str] = Field(
+        title="Customer Role ARN",
+        default=None,
+        description="For cross-account role chaining: The customer's IAM role ARN with S3 read permissions. "
+        "When provided, the connector first assumes the Role ARN above, then uses those credentials "
+        "to assume this customer role. The Role ARN's trust policy must allow assuming this customer role.",
+        order=7,
     )
 
     aws_secret_access_key: Optional[str] = Field(
@@ -74,7 +83,7 @@ class Config(AbstractFileBasedSpec):
         title="Delivery Method",
         discriminator="delivery_type",
         type="object",
-        order=6,
+        order=8,
         display_type="radio",
         group="advanced",
         default="use_records_transfer",
@@ -87,6 +96,14 @@ class Config(AbstractFileBasedSpec):
         if (aws_access_key_id or aws_secret_access_key) and not (aws_access_key_id and aws_secret_access_key):
             raise ValidationError(
                 "`aws_access_key_id` and `aws_secret_access_key` are both required to authenticate with AWS.", model=Config
+            )
+
+        # Validate role chaining: customer_role_arn requires role_arn
+        customer_role_arn = values.get("customer_role_arn")
+        role_arn = values.get("role_arn")
+        if customer_role_arn and not role_arn:
+            raise ValidationError(
+                "`customer_role_arn` requires `role_arn` to be provided for role chaining.", model=Config
             )
 
         if is_cloud_environment():

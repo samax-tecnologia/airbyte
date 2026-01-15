@@ -433,8 +433,14 @@
       },
       "role_arn": {
         "title": "AWS Role ARN",
-        "description": "Specifies the Amazon Resource Name (ARN) of an IAM role that you want to use to perform operations requested using this profile. Set the External ID to the Airbyte workspace ID, which can be found in the URL of this page.",
+        "description": "Specifies the Amazon Resource Name (ARN) of an IAM role that you want to assume to access the S3 bucket. When provided along with AWS Access Key ID and Secret, the connector will use those credentials to call AWS STS AssumeRole and obtain temporary credentials for the specified role. This enables cross-account access where the provided credentials belong to an account that has permission to assume a role in another account that has S3 access. For cross-account role chaining, also provide the Customer Role ARN field.",
         "order": 6,
+        "type": "string"
+      },
+      "customer_role_arn": {
+        "title": "Customer Role ARN",
+        "description": "For cross-account role chaining: The customer's IAM role ARN with S3 read permissions. When provided, the connector first assumes the Role ARN above, then uses those credentials to assume this customer role. The Role ARN's trust policy must allow assuming this customer role.",
+        "order": 7,
         "type": "string"
       },
       "aws_secret_access_key": {
@@ -696,9 +702,16 @@
           },
           "role_arn": {
             "title": "AWS Role ARN",
-            "description": "Specifies the Amazon Resource Name (ARN) of an IAM role that you want to use to perform operations requested using this profile. Set the External ID to the Airbyte workspace ID, which can be found in the URL of this page.",
+            "description": "Specifies the Amazon Resource Name (ARN) of an IAM role that you want to assume to access the S3 bucket. For cross-account role chaining, also provide the Customer Role ARN field.",
             "always_show": true,
             "order": 7,
+            "type": "string"
+          },
+          "customer_role_arn": {
+            "title": "Customer Role ARN",
+            "description": "For cross-account role chaining: The customer's IAM role ARN with S3 read permissions.",
+            "always_show": true,
+            "order": 8,
             "type": "string"
           },
           "path_prefix": {

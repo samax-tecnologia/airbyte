@@ -101,32 +101,50 @@ class SourceS3StreamReader(AbstractFileBasedStreamReader):
         If `aws_access_key_id` and `aws_secret_access_key` are provided in the config, they will be used to authenticate
         the STS client for the AssumeRole call. This enables cross-account access where the provided credentials belong
         to an account that has permission to assume a role in another account that has S3 access.
+
+        If `customer_role_arn` is also provided, the method performs role chaining: first assuming `role_arn`, then
+        using those credentials to assume `customer_role_arn` for S3 access.
         """
 
         def refresh():
-            # Use provided credentials if available, otherwise fall back to default credential chain
-            if self.config.role_arn and self.config.aws_access_key_id and self.config.aws_secret_access_key:
-                client = boto3.client(
+            # Step 1: Use provided credentials if available, otherwise fall back to default credential chain
+            if self.config.aws_access_key_id and self.config.aws_secret_access_key:
+                sts_client = boto3.client(
                     "sts",
                     aws_access_key_id=self.config.aws_access_key_id,
                     aws_secret_access_key=self.config.aws_secret_access_key,
                 )
             else:
-                client = boto3.client("sts")
+                sts_client = boto3.client("sts")
 
+            # Step 2: Assume the first role (role_arn)
+            assume_role_kwargs = {
+                "RoleArn": self.config.role_arn,
+                "RoleSessionName": "airbyte-source-s3",
+            }
             if AWS_EXTERNAL_ID:
-                role = client.assume_role(
-                    RoleArn=self.config.role_arn,
-                    RoleSessionName="airbyte-source-s3",
-                    ExternalId=AWS_EXTERNAL_ID,
-                )
-            else:
-                role = client.assume_role(
-                    RoleArn=self.config.role_arn,
-                    RoleSessionName="airbyte-source-s3",
-                )
+                assume_role_kwargs["ExternalId"] = AWS_EXTERNAL_ID
 
-            creds = role.get("Credentials", {})
+            first_role = sts_client.assume_role(**assume_role_kwargs)
+            first_creds = first_role.get("Credentials", {})
+
+            # Step 3: If customer_role_arn is provided, chain to assume it
+            if self.config.customer_role_arn:
+                chained_sts = boto3.client(
+                    "sts",
+                    aws_access_key_id=first_creds["AccessKeyId"],
+                    aws_secret_access_key=first_creds["SecretAccessKey"],
+                    aws_session_token=first_creds["SessionToken"],
+                )
+                final_role = chained_sts.assume_role(
+                    RoleArn=self.config.customer_role_arn,
+                    RoleSessionName="airbyte-customer-s3",
+                )
+                creds = final_role.get("Credentials", {})
+            else:
+                # Single role assumption (backward compatible)
+                creds = first_creds
+
             return {
                 "access_key": creds["AccessKeyId"],
                 "secret_key": creds["SecretAccessKey"],
