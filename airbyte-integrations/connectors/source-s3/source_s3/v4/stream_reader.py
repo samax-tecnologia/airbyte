@@ -136,10 +136,13 @@ class SourceS3StreamReader(AbstractFileBasedStreamReader):
                     aws_secret_access_key=first_creds["SecretAccessKey"],
                     aws_session_token=first_creds["SessionToken"],
                 )
-                final_role = chained_sts.assume_role(
-                    RoleArn=self.config.customer_role_arn,
-                    RoleSessionName="airbyte-customer-s3",
-                )
+                customer_assume_kwargs = {
+                    "RoleArn": self.config.customer_role_arn,
+                    "RoleSessionName": "airbyte-customer-s3",
+                }
+                if self.config.customer_external_id:
+                    customer_assume_kwargs["ExternalId"] = self.config.customer_external_id
+                final_role = chained_sts.assume_role(**customer_assume_kwargs)
                 creds = final_role.get("Credentials", {})
             else:
                 # Single role assumption (backward compatible)

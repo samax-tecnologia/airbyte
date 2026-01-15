@@ -54,6 +54,15 @@ class Config(AbstractFileBasedSpec):
         order=7,
     )
 
+    customer_external_id: Optional[str] = Field(
+        title="Customer External ID",
+        default=None,
+        description="External ID required by the customer's role trust policy for secure cross-account access. "
+        "This value must match the External ID configured in the customer's IAM role trust relationship.",
+        airbyte_secret=True,
+        order=8,
+    )
+
     aws_secret_access_key: Optional[str] = Field(
         title="AWS Secret Access Key",
         default=None,
@@ -83,7 +92,7 @@ class Config(AbstractFileBasedSpec):
         title="Delivery Method",
         discriminator="delivery_type",
         type="object",
-        order=8,
+        order=9,
         display_type="radio",
         group="advanced",
         default="use_records_transfer",
@@ -100,10 +109,15 @@ class Config(AbstractFileBasedSpec):
 
         # Validate role chaining: customer_role_arn requires role_arn
         customer_role_arn = values.get("customer_role_arn")
+        customer_external_id = values.get("customer_external_id")
         role_arn = values.get("role_arn")
         if customer_role_arn and not role_arn:
             raise ValidationError(
                 "`customer_role_arn` requires `role_arn` to be provided for role chaining.", model=Config
+            )
+        if customer_external_id and not customer_role_arn:
+            raise ValidationError(
+                "`customer_external_id` requires `customer_role_arn` to be provided.", model=Config
             )
 
         if is_cloud_environment():

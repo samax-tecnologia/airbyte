@@ -443,6 +443,13 @@
         "order": 7,
         "type": "string"
       },
+      "customer_external_id": {
+        "title": "Customer External ID",
+        "description": "External ID required by the customer's role trust policy for secure cross-account access. This value must match the External ID configured in the customer's IAM role trust relationship.",
+        "airbyte_secret": true,
+        "order": 8,
+        "type": "string"
+      },
       "aws_secret_access_key": {
         "title": "AWS Secret Access Key",
         "description": "In order to access private Buckets stored on AWS S3, this connector requires credentials with the proper permissions. If accessing publicly available data, this field is not necessary.",
@@ -713,6 +720,14 @@
             "description": "For cross-account role chaining: The customer's IAM role ARN with S3 read permissions.",
             "always_show": true,
             "order": 8,
+            "type": "string"
+          },
+          "customer_external_id": {
+            "title": "Customer External ID",
+            "description": "External ID required by the customer's role trust policy for secure cross-account access.",
+            "airbyte_secret": true,
+            "always_show": true,
+            "order": 9,
             "type": "string"
           },
           "path_prefix": {
